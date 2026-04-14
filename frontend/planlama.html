@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Planlama</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.cal-entry { cursor:pointer; }
+.cal-entry:hover { opacity:0.8; }
+.cal-day { cursor:pointer; }
+.gun-detay { margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Planlama Takvimi</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="showModal('modal-ekle')">+ Plan Ekle</button>
+      </div>
+    </div>
+    <div class="page">
+
+      <!-- Lokasyon seçici -->
+      <div class="lok-tabs" id="lok-tabs"></div>
+
+      <!-- Takvim navigasyon -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="calendar-header">
+          <button class="btn btn-secondary btn-sm" onclick="oncekiAy()">← Önceki</button>
+          <span class="calendar-title" id="cal-title"></span>
+          <button class="btn btn-secondary btn-sm" onclick="sonrakiAy()">Sonraki →</button>
+        </div>
+
+        <!-- Gün isimleri -->
+        <div class="calendar-grid" id="cal-grid">
+          <div class="cal-day-name">Pzt</div>
+          <div class="cal-day-name">Sal</div>
+          <div class="cal-day-name">Çar</div>
+          <div class="cal-day-name">Per</div>
+          <div class="cal-day-name">Cum</div>
+          <div class="cal-day-name">Cmt</div>
+          <div class="cal-day-name">Paz</div>
+        </div>
+      </div>
+
+      <!-- Seçilen gün detayı -->
+      <div class="card gun-detay" id="gun-detay" style="display:none">
+        <div class="card-title" id="gun-baslik">Gün Detayı</div>
+        <div id="gun-icerik"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-ekle" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Plan Kaydı Ekle</h3>
+      <button class="modal-close" onclick="hideModal('modal-ekle')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>Tarih</label>
+            <input type="date" id="f-tarih">
+          </div>
+          <div class="form-group">
+            <label>Lokasyon</label>
+            <select id="f-lok">
+              <option value="1">Çiğli</option>
+              <option value="2">ESBAŞ</option>
+              <option value="3">Karaman</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>Müşteri</label>
+            <input type="text" id="f-musteri" placeholder="DOM, TOB, İSPAK...">
+          </div>
+          <div class="form-group">
+            <label>Plan Türü</label>
+            <select id="f-tur">
+              <option value="GRV">Gravür</option>
+              <option value="BAKIR">Bakır</option>
+              <option value="SEVK">Sevk</option>
+              <option value="PLAN">Genel Plan</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>Plan Adet</label>
+            <input type="number" id="f-plan" min="0">
+          </div>
+          <div class="form-group">
+            <label>Gerçekleşen Adet</label>
+            <input type="number" id="f-gercek" min="0">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideModal('modal-ekle')">İptal</button>
+      <button class="btn btn-primary" onclick="kaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+document.getElementById('f-tarih').value = bugun();
+
+let simdiYil = new Date().getFullYear();
+let simdiAy = new Date().getMonth() + 1;
+let planVerisi = [];
+
+const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+               'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+initLokTabs('lok-tabs', () => yukle());
+
+function oncekiAy() {
+  if (simdiAy === 1) { simdiAy = 12; simdiYil--; }
+  else simdiAy--;
+  yukle();
+}
+function sonrakiAy() {
+  if (simdiAy === 12) { simdiAy = 1; simdiYil++; }
+  else simdiAy++;
+  yukle();
+}
+
+async function yukle() {
+  document.getElementById('cal-title').textContent = AYLAR[simdiAy - 1] + ' ' + simdiYil;
+  const params = new URLSearchParams({ lokasyon_id: secilenLokasyon, yil: simdiYil, ay: simdiAy });
+  planVerisi = await get('/planlama?' + params) || [];
+  renderTakvim();
+}
+
+function renderTakvim() {
+  const grid = document.getElementById('cal-grid');
+  // İlk 7 başlık div'ini koru, geri kalanı temizle
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  const ilkGun = new Date(simdiYil, simdiAy - 1, 1);
+  const sonGun = new Date(simdiYil, simdiAy, 0);
+  const bugunStr = bugun();
+
+  // Boş hücreler (Pazartesi=1, Pazar=7)
+  let haftaGunu = ilkGun.getDay() || 7;
+  for (let i = 1; i < haftaGunu; i++) {
+    const bos = document.createElement('div');
+    bos.className = 'cal-day empty';
+    grid.appendChild(bos);
+  }
+
+  // Gün hücreleri
+  for (let g = 1; g <= sonGun.getDate(); g++) {
+    const tarihStr = `${simdiYil}-${String(simdiAy).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+    const gunKayitlari = planVerisi.filter(p => p.tarih && p.tarih.startsWith(tarihStr));
+
+    const div = document.createElement('div');
+    div.className = 'cal-day' + (tarihStr === bugunStr ? ' today' : '');
+    div.onclick = () => gunDetay(tarihStr, gunKayitlari);
+
+    let icerik = `<div class="cal-date">${g}</div>`;
+    gunKayitlari.slice(0, 3).forEach(k => {
+      const cls = k.gerceklesen_adet ? 'gercek' : 'plan';
+      const deger = k.gerceklesen_adet || k.plan_adet || '';
+      icerik += `<div class="cal-entry ${cls}" title="${k.musteri||''} ${k.plan_turu||''}">${k.musteri ? k.musteri.substring(0,6) + ' ' : ''}${deger}</div>`;
+    });
+    if (gunKayitlari.length > 3) {
+      icerik += `<div style="font-size:10px;color:var(--text3)">+${gunKayitlari.length - 3} daha</div>`;
+    }
+    div.innerHTML = icerik;
+    grid.appendChild(div);
+  }
+}
+
+function gunDetay(tarih, kayitlar) {
+  document.getElementById('gun-baslik').textContent = formatTarih(tarih) + ' — Plan Detayı';
+  const detay = document.getElementById('gun-detay');
+  detay.style.display = 'block';
+
+  if (kayitlar.length === 0) {
+    document.getElementById('gun-icerik').innerHTML = `
+      <div style="color:var(--text3);font-size:13px;padding:8px 0">Bu gün için plan kaydı yok.</div>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="planEkleGun('${tarih}')">+ Bu Güne Plan Ekle</button>
+    `;
+    return;
+  }
+
+  document.getElementById('gun-icerik').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Müşteri</th><th>Plan Türü</th>
+          <th class="td-num">Plan</th><th class="td-num">Gerçek</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${kayitlar.map(k => `<tr>
+            <td>${k.musteri || '-'}</td>
+            <td><span class="badge badge-blue">${k.plan_turu || '-'}</span></td>
+            <td class="td-num">${k.plan_adet ?? '-'}</td>
+            <td class="td-num ${k.gerceklesen_adet ? 'sapma-iyi' : ''}">${k.gerceklesen_adet ?? '-'}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="sil(${k.id})">Sil</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="planEkleGun('${tarih}')">+ Bu Güne Plan Ekle</button>
+  `;
+  detay.scrollIntoView({ behavior: 'smooth' });
+}
+
+function planEkleGun(tarih) {
+  document.getElementById('f-tarih').value = tarih;
+  document.getElementById('f-lok').value = secilenLokasyon;
+  showModal('modal-ekle');
+}
+
+async function kaydet() {
+  const kayit = {
+    tarih: document.getElementById('f-tarih').value,
+    lokasyon_id: parseInt(document.getElementById('f-lok').value),
+    musteri: document.getElementById('f-musteri').value || null,
+    plan_turu: document.getElementById('f-tur').value,
+    plan_adet: parseInt(document.getElementById('f-plan').value) || null,
+    gerceklesen_adet: parseInt(document.getElementById('f-gercek').value) || null
+  };
+  if (!kayit.tarih) return showToast('Tarih giriniz!', 'danger');
+  const res = await post('/planlama', kayit);
+  if (res) {
+    showToast('Plan eklendi', 'success');
+    hideModal('modal-ekle');
+    yukle();
+  }
+}
+
+async function sil(id) {
+  if (!confirm('Bu plan kaydını silmek istiyor musunuz?')) return;
+  const res = await del('/planlama/' + id);
+  if (res) { showToast('Silindi', 'success'); yukle(); }
+}
+
+setupModalClose();
+yukle();
+</script>
+</body>
+</html>

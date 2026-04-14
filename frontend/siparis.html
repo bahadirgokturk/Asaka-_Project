@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Sipariş</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Sipariş Takibi</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="showModal('modal-ekle')">+ Yeni Kayıt</button>
+      </div>
+    </div>
+    <div class="page">
+      <div class="filter-bar">
+        <label>Başlangıç:</label><input type="date" id="f-bas" style="width:145px">
+        <label>Bitiş:</label><input type="date" id="f-bit" style="width:145px">
+        <button class="btn btn-secondary btn-sm" onclick="yukle()">Filtrele</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Sipariş Kayıtları</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Tarih</th><th>Kategori</th>
+              <th class="td-num">Hedef</th><th class="td-num">Gerçek</th><th class="td-num">Fark</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-ekle" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Sipariş Kaydı</h3><button class="modal-close" onclick="hideModal('modal-ekle')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Tarih</label><input type="date" id="f-tarih"></div>
+        <div class="form-group"><label>Kategori</label>
+          <select id="f-kat">
+            <option>İzmir Gravür</option><option>İspak Gravür</option><option>Çelik</option>
+            <option>Bakır</option><option>Tobacco Gravür</option><option>Tobacco Tipping</option>
+            <option>Tobacco GTP</option><option>Emboss Adet</option>
+            <option>Export Çelik</option><option>Export Bakırlı</option><option>Dekrom</option>
+          </select>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Hedef</label><input type="number" id="f-hedef" min="0" value="0"></div>
+          <div class="form-group"><label>Gerçek</label><input type="number" id="f-gercek" min="0" value="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideModal('modal-ekle')">İptal</button>
+      <button class="btn btn-primary" onclick="kaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+document.getElementById('f-tarih').value=bugun();
+const bas=document.getElementById('f-bas'),bit=document.getElementById('f-bit');
+bas.value=haftaBaslangic();bit.value=haftaBitis();
+async function yukle(){
+  const p=new URLSearchParams({baslangic:bas.value,bitis:bit.value});
+  const data=await get('/siparis?'+p);if(!data)return;
+  document.getElementById('tbody').innerHTML=data.length===0?'<tr><td colspan="5" class="td-center" style="padding:20px;color:var(--text3)">Kayıt yok</td></tr>'
+    :data.map(r=>{const fark=(r.gercek||0)-(r.hedef||0);return`<tr>
+      <td><strong>${formatTarih(r.tarih)}</strong></td>
+      <td>${r.kategori}</td>
+      <td class="td-num">${r.hedef??'-'}</td>
+      <td class="td-num">${r.gercek??'-'}</td>
+      <td class="td-num ${fark>=0?'sapma-iyi':'sapma-kotu'}">${fark>0?'+'+fark:fark}</td>
+    </tr>`;}).join('');
+}
+async function kaydet(){
+  const kayit={
+    tarih:document.getElementById('f-tarih').value,
+    kategori:document.getElementById('f-kat').value,
+    hedef:parseInt(document.getElementById('f-hedef').value)||0,
+    gercek:parseInt(document.getElementById('f-gercek').value)||0
+  };
+  if(!kayit.tarih)return showToast('Tarih giriniz!','danger');
+  const res=await post('/siparis',kayit);
+  if(res){showToast('Kaydedildi','success');hideModal('modal-ekle');yukle();}
+}
+setupModalClose();yukle();
+</script>
+</body>
+</html>

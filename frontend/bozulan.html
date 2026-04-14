@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Bozulan Silindir</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.hata-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.hata-pill {
+  padding:4px 12px; border-radius:16px; border:1.5px solid var(--border);
+  font-size:12px; cursor:pointer; background:var(--bg2); color:var(--text2);
+  transition:all 0.15s;
+}
+.hata-pill.active { background:var(--danger); border-color:var(--danger); color:#fff; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Bozulan Silindir</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="showModal('modal-ekle')">+ Yeni Kayıt</button>
+      </div>
+    </div>
+    <div class="page">
+
+      <!-- Filtreler -->
+      <div class="filter-bar">
+        <label>Başlangıç:</label>
+        <input type="date" id="f-baslangic" style="width:145px">
+        <label>Bitiş:</label>
+        <input type="date" id="f-bitis" style="width:145px">
+        <label>Lokasyon:</label>
+        <select id="f-lokasyon" style="width:120px" onchange="yukle()">
+          <option value="">Tümü</option>
+          <option value="1">Çiğli</option>
+          <option value="2">ESBAŞ</option>
+          <option value="3">Karaman</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="yukle()">Filtrele</button>
+        <button class="btn btn-secondary btn-sm" onclick="buHafta()">Bu Hafta</button>
+      </div>
+
+      <!-- Hata tipi filtresi -->
+      <div class="hata-pills" id="hata-pills"></div>
+
+      <!-- Özet -->
+      <div class="grid grid-4" id="ozet" style="margin-bottom:20px"></div>
+
+      <!-- Tablo -->
+      <div class="card">
+        <div class="card-title">Bozulan Silindir Kayıtları</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Lokasyon</th>
+                <th class="td-num">Adet</th>
+                <th>Hata Tipi</th>
+                <th>Neden / Açıklama</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tablo-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-ekle" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Bozulan Silindir Kaydı</h3>
+      <button class="modal-close" onclick="hideModal('modal-ekle')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>Tarih</label>
+            <input type="date" id="f-tarih">
+          </div>
+          <div class="form-group">
+            <label>Lokasyon</label>
+            <select id="f-lok">
+              <option value="1">Çiğli</option>
+              <option value="2">ESBAŞ</option>
+              <option value="3">Karaman</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>Bozulan Adet</label>
+            <input type="number" id="f-adet" min="1" value="1">
+          </div>
+          <div class="form-group">
+            <label>Hata Tipi</label>
+            <select id="f-hata"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Neden / Etkilenen Silindir / Açıklama</label>
+          <textarea id="f-neden" placeholder="Bozulma nedeni, etkilenen silindir no, ek açıklama..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideModal('modal-ekle')">İptal</button>
+      <button class="btn btn-primary" onclick="kaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+document.getElementById('f-tarih').value = bugun();
+
+const bas = document.getElementById('f-baslangic');
+const bit = document.getElementById('f-bitis');
+bas.value = haftaBaslangic();
+bit.value = haftaBitis();
+
+let secilenHata = '';
+
+async function initHataTipleri() {
+  const tipler = await get('/bozulan/hata-tipleri');
+  if (!tipler) return;
+
+  // Select için
+  const sel = document.getElementById('f-hata');
+  tipler.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    sel.appendChild(opt);
+  });
+
+  // Filtre pilleri
+  const pills = document.getElementById('hata-pills');
+  const tumBtn = document.createElement('button');
+  tumBtn.className = 'hata-pill active';
+  tumBtn.textContent = 'Tümü';
+  tumBtn.onclick = () => { secilenHata = ''; setActivePill(tumBtn); yukle(); };
+  pills.appendChild(tumBtn);
+
+  tipler.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'hata-pill';
+    btn.textContent = t;
+    btn.onclick = () => { secilenHata = t; setActivePill(btn); yukle(); };
+    pills.appendChild(btn);
+  });
+}
+
+function setActivePill(el) {
+  document.querySelectorAll('.hata-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function buHafta() {
+  bas.value = haftaBaslangic();
+  bit.value = haftaBitis();
+  yukle();
+}
+
+async function yukle() {
+  const params = new URLSearchParams();
+  const lokVal = document.getElementById('f-lokasyon').value;
+  if (lokVal) params.append('lokasyon_id', lokVal);
+  if (bas.value) params.append('baslangic', bas.value);
+  if (bit.value) params.append('bitis', bit.value);
+  if (secilenHata) params.append('hata_tipi', secilenHata);
+
+  const data = await get('/bozulan?' + params);
+  if (!data) return;
+
+  const topAdet = data.reduce((s, r) => s + (r.adet || 0), 0);
+
+  // Hata tipi dağılımı
+  const hataDagilim = {};
+  data.forEach(r => {
+    if (r.hata_tipi) hataDagilim[r.hata_tipi] = (hataDagilim[r.hata_tipi] || 0) + (r.adet || 0);
+  });
+  const enCok = Object.entries(hataDagilim).sort((a, b) => b[1] - a[1])[0];
+
+  document.getElementById('ozet').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-label">Toplam Bozulan</div>
+      <div class="metric-value ${topAdet>20?'metric-bad':topAdet>10?'metric-warn':''}">${topAdet}</div>
+      <div class="metric-sub">Seçilen dönem</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Kayıt Sayısı</div>
+      <div class="metric-value">${data.length}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">En Sık Hata</div>
+      <div class="metric-value" style="font-size:16px">${enCok ? enCok[0] : '-'}</div>
+      <div class="metric-sub">${enCok ? enCok[1] + ' adet' : ''}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Günlük Ortalama</div>
+      <div class="metric-value">${data.length > 0 ? (topAdet / [...new Set(data.map(r => r.tarih))].length).toFixed(1) : '0'}</div>
+    </div>
+  `;
+
+  document.getElementById('tablo-body').innerHTML = data.length === 0
+    ? '<tr><td colspan="6" class="td-center" style="padding:20px;color:var(--text3)">Kayıt bulunamadı</td></tr>'
+    : data.map(r => `<tr>
+        <td><strong>${formatTarih(r.tarih)}</strong></td>
+        <td><span class="badge badge-blue">${r.lokasyon_ad || lokAd(r.lokasyon_id)}</span></td>
+        <td class="td-num"><strong style="color:var(--danger)">${r.adet || '-'}</strong></td>
+        <td>${r.hata_tipi ? `<span class="badge badge-red">${r.hata_tipi}</span>` : '-'}</td>
+        <td style="font-size:12px;color:var(--text2);max-width:300px">${r.neden || '-'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="sil(${r.id})">Sil</button></td>
+      </tr>`).join('');
+}
+
+async function kaydet() {
+  const kayit = {
+    tarih: document.getElementById('f-tarih').value,
+    lokasyon_id: parseInt(document.getElementById('f-lok').value),
+    adet: parseInt(document.getElementById('f-adet').value) || 1,
+    hata_tipi: document.getElementById('f-hata').value,
+    neden: document.getElementById('f-neden').value || null
+  };
+  if (!kayit.tarih) return showToast('Tarih giriniz!', 'danger');
+  const res = await post('/bozulan', kayit);
+  if (res) {
+    showToast('Kayıt eklendi', 'success');
+    hideModal('modal-ekle');
+    document.getElementById('f-neden').value = '';
+    yukle();
+  }
+}
+
+async function sil(id) {
+  if (!confirm('Bu kaydı silmek istiyor musunuz?')) return;
+  const res = await del('/bozulan/' + id);
+  if (res) { showToast('Silindi', 'success'); yukle(); }
+}
+
+setupModalClose();
+initHataTipleri();
+yukle();
+</script>
+</body>
+</html>

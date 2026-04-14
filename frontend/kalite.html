@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Kalite</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Kalite Takibi</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="showModal('modal-ekle')">+ Yeni Kayıt</button>
+      </div>
+    </div>
+    <div class="page">
+      <div class="lok-tabs" id="lok-tabs"></div>
+      <div class="filter-bar">
+        <label>Başlangıç:</label><input type="date" id="f-bas" style="width:145px">
+        <label>Bitiş:</label><input type="date" id="f-bit" style="width:145px">
+        <button class="btn btn-secondary btn-sm" onclick="yukle()">Filtrele</button>
+        <button class="btn btn-secondary btn-sm" onclick="buHafta()">Bu Hafta</button>
+      </div>
+      <div class="grid grid-4" id="ozet" style="margin-bottom:20px"></div>
+      <div class="card">
+        <div class="card-title">Kalite Kayıtları</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Tarih</th><th class="td-num">Hedef</th><th class="td-num">Gerçek</th>
+              <th class="td-num">Onayda</th><th class="td-num">Top. Boz.</th>
+              <th class="td-num">Delik</th><th class="td-num">Kabarık</th>
+              <th class="td-num">Bakır At.</th><th class="td-num">Lak Kal.</th>
+              <th class="td-num">Ek Kap.</th><th class="td-num">Diğer</th><th></th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ekle" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Kalite Kaydı</h3>
+      <button class="modal-close" onclick="hideModal('modal-ekle')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Tarih</label><input type="date" id="f-tarih"></div>
+          <div class="form-group"><label>Lokasyon</label>
+            <select id="f-lok">
+              <option value="1">Çiğli</option><option value="2">ESBAŞ</option><option value="3">Karaman</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Hedef</label><input type="number" id="f-hedef" min="0"></div>
+          <div class="form-group"><label>Gerçek</label><input type="number" id="f-gercek" min="0"></div>
+          <div class="form-group"><label>Onayda</label><input type="number" id="f-onayda" min="0"></div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Delik</label><input type="number" id="f-delik" min="0" value="0"></div>
+          <div class="form-group"><label>Kabarık</label><input type="number" id="f-kabarak" min="0" value="0"></div>
+          <div class="form-group"><label>Krom Atması</label><input type="number" id="f-krom" min="0" value="0"></div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Lak Kalması</label><input type="number" id="f-lak" min="0" value="0"></div>
+          <div class="form-group"><label>Bakır Atması</label><input type="number" id="f-bakir" min="0" value="0"></div>
+          <div class="form-group"><label>Ek Kaplama</label><input type="number" id="f-ekkap" min="0" value="0"></div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Titreme</label><input type="number" id="f-titreme" min="0" value="0"></div>
+          <div class="form-group"><label>Atlama</label><input type="number" id="f-atlama" min="0" value="0"></div>
+          <div class="form-group"><label>Diğer</label><input type="number" id="f-diger" min="0" value="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideModal('modal-ekle')">İptal</button>
+      <button class="btn btn-primary" onclick="kaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+document.getElementById('f-tarih').value = bugun();
+const bas = document.getElementById('f-bas');
+const bit = document.getElementById('f-bit');
+bas.value = haftaBaslangic(); bit.value = haftaBitis();
+function buHafta() { bas.value = haftaBaslangic(); bit.value = haftaBitis(); yukle(); }
+initLokTabs('lok-tabs', () => yukle());
+
+async function yukle() {
+  const params = new URLSearchParams({ lokasyon_id: secilenLokasyon, baslangic: bas.value, bitis: bit.value });
+  const data = await get('/kalite?' + params);
+  if (!data) return;
+  const topG = data.reduce((s,r)=>s+(r.gercek||0),0);
+  const topH = data.reduce((s,r)=>s+(r.hedef||0),0);
+  const topB = data.reduce((s,r)=>s+(r.toplam_bozulan||0),0);
+  const oran = topH>0?Math.round(topG/topH*100):0;
+  document.getElementById('ozet').innerHTML = `
+    <div class="metric-card"><div class="metric-label">Dönem Hedef</div><div class="metric-value">${topH}</div></div>
+    <div class="metric-card"><div class="metric-label">Dönem Gerçek</div><div class="metric-value ${oran>=95?'metric-good':oran>=80?'metric-warn':'metric-bad'}">${topG}</div><div class="metric-sub">%${oran}</div></div>
+    <div class="metric-card"><div class="metric-label">Toplam Bozulan</div><div class="metric-value ${topB>20?'metric-bad':''}">${topB}</div></div>
+    <div class="metric-card"><div class="metric-label">Kayıt Sayısı</div><div class="metric-value">${data.length}</div></div>
+  `;
+  document.getElementById('tbody').innerHTML = data.length===0
+    ? '<tr><td colspan="12" class="td-center" style="padding:20px;color:var(--text3)">Kayıt bulunamadı</td></tr>'
+    : data.map(r=>`<tr>
+        <td><strong>${formatTarih(r.tarih)}</strong></td>
+        <td class="td-num">${r.hedef??'-'}</td><td class="td-num">${r.gercek??'-'}</td>
+        <td class="td-num">${r.onayda??'-'}</td>
+        <td class="td-num ${(r.toplam_bozulan||0)>5?'sapma-kotu':''}">${r.toplam_bozulan??'-'}</td>
+        <td class="td-num">${r.delik||'-'}</td><td class="td-num">${r.kabarak||'-'}</td>
+        <td class="td-num">${r.bakir_atmasi||'-'}</td><td class="td-num">${r.lak_kalmasi||'-'}</td>
+        <td class="td-num">${r.ek_kaplama||'-'}</td><td class="td-num">${r.diger||'-'}</td>
+        <td></td>
+      </tr>`).join('');
+}
+
+async function kaydet() {
+  const v = id => { const el=document.getElementById(id); return parseInt(el.value)||0; };
+  const kayit = {
+    tarih: document.getElementById('f-tarih').value,
+    lokasyon_id: parseInt(document.getElementById('f-lok').value),
+    hedef: v('f-hedef'), gercek: v('f-gercek'), onayda: v('f-onayda'),
+    toplam_bozulan: v('f-delik')+v('f-kabarak')+v('f-krom')+v('f-lak')+v('f-bakir')+v('f-ekkap')+v('f-titreme')+v('f-atlama')+v('f-diger'),
+    delik: v('f-delik'), kabarak: v('f-kabarak'), krom_atmasi: v('f-krom'),
+    lak_kalmasi: v('f-lak'), bakir_atmasi: v('f-bakir'), ek_kaplama: v('f-ekkap'),
+    titreme: v('f-titreme'), atlama: v('f-atlama'), diger: v('f-diger')
+  };
+  if (!kayit.tarih) return showToast('Tarih giriniz!', 'danger');
+  const res = await post('/kalite', kayit);
+  if (res) { showToast('Kaydedildi', 'success'); hideModal('modal-ekle'); yukle(); }
+}
+
+setupModalClose(); yukle();
+</script>
+</body>
+</html>

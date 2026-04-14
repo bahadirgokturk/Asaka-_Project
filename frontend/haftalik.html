@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Haftalık Rapor</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.hafta-nav { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.hafta-label { font-size:15px; font-weight:600; }
+.gün-bar-wrap { display:flex; flex-direction:column; gap:6px; }
+.gün-bar-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.gün-bar-label { width:80px; color:var(--text2); }
+.gün-bar-bg { flex:1; height:22px; background:var(--bg3); border-radius:4px; overflow:hidden; position:relative; }
+.gün-bar-fill { height:100%; border-radius:4px; display:flex; align-items:center; padding:0 6px; font-size:11px; font-weight:600; color:#fff; white-space:nowrap; }
+.gün-bar-num { width:60px; text-align:right; font-variant-numeric:tabular-nums; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Haftalık Rapor</div>
+    </div>
+    <div class="page">
+
+      <!-- Lokasyon seçici -->
+      <div class="lok-tabs" id="lok-tabs"></div>
+
+      <!-- Hafta navigasyonu -->
+      <div class="hafta-nav">
+        <button class="btn btn-secondary btn-sm" onclick="oncekiHafta()">← Önceki Hafta</button>
+        <span class="hafta-label" id="hafta-label"></span>
+        <button class="btn btn-secondary btn-sm" onclick="sonrakiHafta()">Sonraki Hafta →</button>
+        <button class="btn btn-secondary btn-sm" onclick="buHafta()">Bu Hafta</button>
+      </div>
+
+      <!-- Haftalık özet kartlar -->
+      <div class="grid grid-4" id="hafta-ozet" style="margin-bottom:20px"></div>
+
+      <!-- Günlük bar chart (üretim) -->
+      <div class="grid grid-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">Günlük Üretim (Hedef vs Gerçek)</div>
+          <div class="gün-bar-wrap" id="uretim-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Bozulan Silindir — Günlük</div>
+          <div class="gün-bar-wrap" id="bozulan-bars"></div>
+        </div>
+      </div>
+
+      <!-- Günlük detay tablosu -->
+      <div class="card">
+        <div class="card-title">Haftalık Detay</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gün</th>
+                <th class="td-num">Hedef</th>
+                <th class="td-num">Gerçek</th>
+                <th class="td-num">Oran %</th>
+                <th>Durum</th>
+                <th class="td-num">Bozulan</th>
+              </tr>
+            </thead>
+            <tbody id="detay-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+
+let basTarih = haftaBaslangic();
+
+function guncelleLabel() {
+  const bit = new Date(basTarih);
+  bit.setDate(bit.getDate() + 6);
+  document.getElementById('hafta-label').textContent =
+    formatTarih(basTarih) + ' — ' + formatTarih(bit.toISOString().split('T')[0]);
+}
+
+function oncekiHafta() {
+  const d = new Date(basTarih);
+  d.setDate(d.getDate() - 7);
+  basTarih = d.toISOString().split('T')[0];
+  yukle();
+}
+function sonrakiHafta() {
+  const d = new Date(basTarih);
+  d.setDate(d.getDate() + 7);
+  basTarih = d.toISOString().split('T')[0];
+  yukle();
+}
+function buHafta() {
+  basTarih = haftaBaslangic();
+  yukle();
+}
+
+function bitisTarih() {
+  const d = new Date(basTarih);
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().split('T')[0];
+}
+
+initLokTabs('lok-tabs', () => yukle());
+
+const GUNLER = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+
+async function yukle() {
+  guncelleLabel();
+  const params = new URLSearchParams({
+    lokasyon_id: secilenLokasyon,
+    baslangic: basTarih,
+    bitis: bitisTarih()
+  });
+  const data = await get('/dashboard/haftalik?' + params);
+  if (!data) return;
+
+  const uretimMap = {};
+  (data.uretim || []).forEach(r => { uretimMap[r.tarih?.split('T')[0]] = r; });
+  const bozulanMap = {};
+  (data.bozulan || []).forEach(r => { bozulanMap[r.tarih?.split('T')[0]] = r.toplam; });
+
+  // 7 gün oluştur
+  const gunler = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(basTarih);
+    d.setDate(d.getDate() + i);
+    const str = d.toISOString().split('T')[0];
+    gunler.push({
+      tarih: str,
+      gunAd: GUNLER[i],
+      hedef: uretimMap[str]?.hedef || 0,
+      gercek: uretimMap[str]?.gercek || 0,
+      bozulan: bozulanMap[str] || 0
+    });
+  }
+
+  // Özet
+  const topH = gunler.reduce((s, g) => s + g.hedef, 0);
+  const topG = gunler.reduce((s, g) => s + g.gercek, 0);
+  const topB = gunler.reduce((s, g) => s + g.bozulan, 0);
+  const oran = topH > 0 ? Math.round(topG / topH * 100) : 0;
+  const calisanGun = gunler.filter(g => g.hedef > 0 || g.gercek > 0).length;
+
+  document.getElementById('hafta-ozet').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-label">Haftalık Hedef</div>
+      <div class="metric-value">${topH}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Haftalık Gerçek</div>
+      <div class="metric-value ${oran>=95?'metric-good':oran>=80?'metric-warn':'metric-bad'}">${topG}</div>
+      <div class="metric-sub">%${oran}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Çalışılan Gün</div>
+      <div class="metric-value">${calisanGun}</div>
+      <div class="metric-sub">Bu hafta</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Toplam Bozulan</div>
+      <div class="metric-value ${topB>15?'metric-bad':topB>7?'metric-warn':''}">${topB}</div>
+    </div>
+  `;
+
+  // Üretim bars
+  const maxH = Math.max(...gunler.map(g => Math.max(g.hedef, g.gercek)), 1);
+  document.getElementById('uretim-bars').innerHTML = gunler.map(g => {
+    const hPct = Math.round(g.hedef / maxH * 100);
+    const gPct = Math.round(g.gercek / maxH * 100);
+    const oran = g.hedef > 0 ? Math.round(g.gercek / g.hedef * 100) : null;
+    return `<div class="gün-bar-row">
+      <span class="gün-bar-label">${g.gunAd}</span>
+      <div class="gün-bar-bg">
+        <div style="position:absolute;top:0;left:0;width:${hPct}%;height:100%;background:var(--border);border-radius:4px;"></div>
+        <div class="gün-bar-fill ${progressClass(oran||0)}" style="width:${gPct}%;position:relative;z-index:1">
+          ${g.gercek > 0 ? g.gercek : ''}
+        </div>
+      </div>
+      <span class="gün-bar-num">${oran !== null ? '%' + oran : '-'}</span>
+    </div>`;
+  }).join('');
+
+  // Bozulan bars
+  const maxB = Math.max(...gunler.map(g => g.bozulan), 1);
+  document.getElementById('bozulan-bars').innerHTML = gunler.map(g => {
+    const pct = Math.round(g.bozulan / maxB * 100);
+    return `<div class="gün-bar-row">
+      <span class="gün-bar-label">${g.gunAd}</span>
+      <div class="gün-bar-bg">
+        <div class="gün-bar-fill" style="width:${pct}%;background:${g.bozulan>5?'var(--danger)':g.bozulan>2?'var(--warning)':'var(--success)'}">
+          ${g.bozulan > 0 ? g.bozulan : ''}
+        </div>
+      </div>
+      <span class="gün-bar-num">${g.bozulan}</span>
+    </div>`;
+  }).join('');
+
+  // Detay tablo
+  document.getElementById('detay-tbody').innerHTML = gunler.map(g => {
+    const pct = g.hedef > 0 ? Math.round(g.gercek / g.hedef * 100) : null;
+    const bos = g.hedef === 0 && g.gercek === 0;
+    return `<tr style="${bos ? 'opacity:0.4' : ''}">
+      <td><strong>${g.gunAd}</strong> <span style="font-size:11px;color:var(--text3)">${formatTarih(g.tarih)}</span></td>
+      <td class="td-num">${g.hedef || '-'}</td>
+      <td class="td-num">${g.gercek || '-'}</td>
+      <td class="td-num ${sapmaClass(g.hedef, g.gercek)}">${pct !== null ? '%' + pct : '-'}</td>
+      <td>${pct === null ? '' : pct>=95?'<span class="badge badge-green">✓ İyi</span>':pct>=80?'<span class="badge badge-yellow">Orta</span>':'<span class="badge badge-red">Düşük</span>'}</td>
+      <td class="td-num ${g.bozulan>0?'sapma-kotu':''}">${g.bozulan || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+yukle();
+</script>
+</body>
+</html>

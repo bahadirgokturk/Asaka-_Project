@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Asakai — Repro</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Repro Takibi</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="showModal('modal-ekle')">+ Yeni Kayıt</button>
+      </div>
+    </div>
+    <div class="page">
+      <div class="lok-tabs" id="lok-tabs"></div>
+      <div class="filter-bar">
+        <label>Başlangıç:</label><input type="date" id="f-bas" style="width:145px">
+        <label>Bitiş:</label><input type="date" id="f-bit" style="width:145px">
+        <button class="btn btn-secondary btn-sm" onclick="yukle()">Filtrele</button>
+        <button class="btn btn-secondary btn-sm" onclick="buHafta()">Bu Hafta</button>
+      </div>
+      <div class="grid grid-4" id="ozet" style="margin-bottom:20px"></div>
+      <div class="card">
+        <div class="card-title">Repro Kayıtları</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Tarih</th>
+              <th class="td-num">Flex Hedef</th><th class="td-num">Flex Çalışır</th>
+              <th class="td-num">Tobacco H.</th><th class="td-num">Tobacco G.</th>
+              <th class="td-num">Üretime (Çiğli)</th><th class="td-num">Üretime (Tob)</th>
+              <th class="td-num">Onayda</th><th class="td-num">Bozulan</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-ekle" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Repro Kaydı</h3><button class="modal-close" onclick="hideModal('modal-ekle')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Tarih</label><input type="date" id="f-tarih"></div>
+          <div class="form-group"><label>Lokasyon</label>
+            <select id="f-lok"><option value="1">Çiğli</option><option value="2">ESBAŞ</option><option value="3">Karaman</option></select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Flex Hedef Dosya</label><input type="number" id="f-fh" min="0" value="0"></div>
+          <div class="form-group"><label>Flex Çalışır Sil.</label><input type="number" id="f-fc" min="0" value="0"></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Tobacco Hedef</label><input type="number" id="f-th" min="0" value="0"></div>
+          <div class="form-group"><label>Tobacco Gerçek</label><input type="number" id="f-tg" min="0" value="0"></div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Üretime Çiğli</label><input type="number" id="f-uc" min="0" value="0"></div>
+          <div class="form-group"><label>Üretime Tobacco</label><input type="number" id="f-ut" min="0" value="0"></div>
+          <div class="form-group"><label>Üretime İspak</label><input type="number" id="f-ui" min="0" value="0"></div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>Onayda</label><input type="number" id="f-on" min="0" value="0"></div>
+          <div class="form-group"><label>Bozulan Sil.</label><input type="number" id="f-boz" min="0" value="0"></div>
+          <div class="form-group"><label>Basılmayan Sil.</label><input type="number" id="f-bas2" min="0" value="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideModal('modal-ekle')">İptal</button>
+      <button class="btn btn-primary" onclick="kaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+<script src="js/app.js"></script>
+<script>
+renderSidebar();
+document.getElementById('f-tarih').value=bugun();
+const bas=document.getElementById('f-bas'),bit=document.getElementById('f-bit');
+bas.value=haftaBaslangic();bit.value=haftaBitis();
+function buHafta(){bas.value=haftaBaslangic();bit.value=haftaBitis();yukle();}
+initLokTabs('lok-tabs',()=>yukle());
+async function yukle(){
+  const p=new URLSearchParams({lokasyon_id:secilenLokasyon,baslangic:bas.value,bitis:bit.value});
+  const data=await get('/repro?'+p);if(!data)return;
+  const tf=data.reduce((s,r)=>s+(r.flex_hedef_dosya||0),0);
+  const tc=data.reduce((s,r)=>s+(r.flex_calisir_silindir||0),0);
+  const tt=data.reduce((s,r)=>s+(r.tobacco_gercek||0),0);
+  const tb=data.reduce((s,r)=>s+(r.bozulan_silindir||0),0);
+  document.getElementById('ozet').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Flex Hedef Dosya</div><div class="metric-value">${tf}</div></div>
+    <div class="metric-card"><div class="metric-label">Flex Çalışır</div><div class="metric-value">${tc}</div></div>
+    <div class="metric-card"><div class="metric-label">Tobacco Gerçek</div><div class="metric-value">${tt}</div></div>
+    <div class="metric-card"><div class="metric-label">Bozulan Sil.</div><div class="metric-value ${tb>5?'metric-bad':''}">${tb}</div></div>
+  `;
+  document.getElementById('tbody').innerHTML=data.length===0?'<tr><td colspan="9" class="td-center" style="padding:20px;color:var(--text3)">Kayıt yok</td></tr>'
+    :data.map(r=>`<tr>
+      <td><strong>${formatTarih(r.tarih)}</strong></td>
+      <td class="td-num">${r.flex_hedef_dosya||'-'}</td>
+      <td class="td-num">${r.flex_calisir_silindir||'-'}</td>
+      <td class="td-num">${r.tobacco_hedef||'-'}</td>
+      <td class="td-num ${sapmaClass(r.tobacco_hedef,r.tobacco_gercek)}">${r.tobacco_gercek||'-'}</td>
+      <td class="td-num">${r.uretime_aktarilan_cigli||'-'}</td>
+      <td class="td-num">${r.uretime_aktarilan_tobacco||'-'}</td>
+      <td class="td-num">${r.onayda||'-'}</td>
+      <td class="td-num ${(r.bozulan_silindir||0)>0?'sapma-kotu':''}">${r.bozulan_silindir||'-'}</td>
+    </tr>`).join('');
+}
+async function kaydet(){
+  const n=id=>parseInt(document.getElementById(id).value)||0;
+  const kayit={
+    tarih:document.getElementById('f-tarih').value,
+    lokasyon_id:parseInt(document.getElementById('f-lok').value),
+    flex_hedef_dosya:n('f-fh'),flex_calisir_silindir:n('f-fc'),
+    tobacco_hedef:n('f-th'),tobacco_gercek:n('f-tg'),
+    uretime_aktarilan_cigli:n('f-uc'),uretime_aktarilan_tobacco:n('f-ut'),uretime_aktarilan_ispak:n('f-ui'),
+    onayda:n('f-on'),bozulan_silindir:n('f-boz'),basilmayan_silindir:n('f-bas2')
+  };
+  if(!kayit.tarih)return showToast('Tarih giriniz!','danger');
+  const res=await post('/repro',kayit);
+  if(res){showToast('Kaydedildi','success');hideModal('modal-ekle');yukle();}
+}
+setupModalClose();yukle();
+</script>
+</body>
+</html>
