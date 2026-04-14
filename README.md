@@ -1,73 +1,92 @@
 # Asakai Hedef Takip Sistemi
 
-## Kurulum (Tek seferlik)
+Saueressig Türkiye — OPEX Departmanı için geliştirilmiş günlük üretim hedef takip sistemi.
+
+---
+
+## Kurulum
+
+### Gereksinimler
+- Python 3.10+
+- Node.js 18+
+- pip
+
+---
+
+### 1. Repoyu İndir
 
 ```bash
-# 1. Python sanal ortam oluştur
-python -m venv venv
-
-# 2. Aktive et
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# 3. Bağımlılıkları yükle
-pip install -r requirements.txt
+git clone https://github.com/bahadirgokturk/Asaka-_Project.git
+cd Asaka-_Project
 ```
 
-## Çalıştırma
+---
+
+### 2. Backend Kurulumu
 
 ```bash
-# Sanal ortamı aktive et (her seferinde)
-venv\Scripts\activate
-
-# Sunucuyu başlat
 cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+pip install -r requirements.txt
+python migrate_users.py
 ```
 
-Tarayıcıda aç: **http://localhost:8000**
+---
 
-## Klasör Yapısı
+### 3. Frontend Kurulumu
 
-```
-asakai/
-├── backend/
-│   ├── main.py          ← FastAPI uygulaması (tüm API)
-│   ├── database.py      ← SQLite veritabanı ve tablolar
-│   └── asakai.db        ← Otomatik oluşturulur
-├── frontend/
-│   ├── index.html       ← Dashboard
-│   ├── uretim.html      ← Üretim girişi (Çiğli/ESBAŞ/Karaman)
-│   ├── bozulan.html     ← Bozulan silindir takibi
-│   ├── planlama.html    ← Takvim görünümlü planlama
-│   ├── kalite.html      ← Kalite takibi
-│   ├── haftalik.html    ← Haftalık rapor
-│   ├── css/style.css    ← Tüm stiller
-│   └── js/app.js        ← Ortak fonksiyonlar
-└── requirements.txt
+```bash
+cd ../frontend
+npm install
 ```
 
-## Modüller
+---
 
-| Sayfa | Açıklama |
-|-------|----------|
-| Dashboard | Günlük özet, tüm lokasyonlar |
-| Üretim | Hedef/gerçek giriş, Çiğli/ESBAŞ/Karaman sekmeli |
-| Bozulan Silindir | Hata tipi filtreli, etkilenen silindir kaydı |
-| Planlama | Takvim görünümü, günlük plan/gerçek |
-| Kalite | Sevk adet, hata tiplerine göre bozulan |
-| Haftalık Rapor | Bar grafik, 7 günlük özet |
+### 4. Çalıştırma
 
-## API Endpointleri
+İki ayrı terminal aç:
 
-- GET/POST `/api/uretim`
-- GET/POST `/api/bozulan`
-- GET/POST `/api/kalite`
-- GET/POST `/api/emboss`
-- GET/POST `/api/repro`
-- GET/POST `/api/planlama`
-- GET `/api/dashboard`
-- GET `/api/dashboard/haftalik`
-- GET `/api/lokasyonlar`
+**Terminal 1 — Backend:**
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm start
+```
+
+Tarayıcıda `http://localhost:3000` adresini aç.
+
+---
+
+## Giriş Bilgileri
+
+| Kullanıcı | Şifre | Rol |
+|-----------|-------|-----|
+| `admin` | `admin123` | Admin — her şeyi görür |
+| `cigli` | `cigli123` | Sorumlu — sadece Çiğli |
+| `esbas` | `esbas123` | Sorumlu — sadece ESBAŞ |
+| `karaman` | `karaman123` | Sorumlu — sadece Karaman |
+
+---
+
+## Özellikler
+
+- **Dashboard** — günlük ve haftalık özet
+- **Planlama** — aylık takvim, GRV/Bakır/Sevk plan girişi
+- **Üretim** — günlük hedef/gerçek takibi, bozulan silindir kaydı
+- **Kalite** — sevk ve hata tipi takibi
+- **Repro** — silindir üretim takibi
+- **Emboss** — Emboss & Cellaxy takibi
+- **Sipariş** — kategori bazlı sipariş takibi
+- **Kullanıcı Yönetimi** — admin paneli, rol tabanlı erişim
+
+---
+
+## Notlar
+
+- Sistem tamamen lokaldir, internet bağlantısı gerekmez
+- Veriler `backend/asakai.db` SQLite dosyasında saklanır
+- Yeni kullanıcı eklemek için admin panelini kullan
