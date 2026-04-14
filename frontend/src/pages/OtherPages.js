@@ -22,7 +22,8 @@ export function ReproPage() {
     if (filtre.bitis) p.append("bitis", filtre.bitis);
     fetch(`/api/repro/liste?${p}`).then(r=>r.json()).then(d=>setData(d.data||[]));
   };
-  useEffect(yukle, []);
+
+  useEffect(() => { yukle(); }, []);
 
   const kaydet = async () => {
     const body = {...form};
@@ -136,7 +137,8 @@ export function EmbossPage() {
   const [mesaj, setMesaj] = useState("");
 
   const yukle = () => fetch("/api/emboss/liste").then(r=>r.json()).then(d=>setData(d.data||[]));
-  useEffect(yukle, []);
+
+  useEffect(() => { yukle(); }, []);
 
   const kaydet = async () => {
     const body = {...form,
@@ -238,7 +240,8 @@ export function SiparisPage() {
     if (filtre.kategori) p.append("kategori", filtre.kategori);
     fetch(`/api/siparis/liste?${p}`).then(r=>r.json()).then(d=>setData(d.data||[]));
   };
-  useEffect(yukle, []);
+
+  useEffect(() => { yukle(); }, []);
 
   const kaydet = async () => {
     const res = await fetch("/api/siparis/kaydet", {
@@ -328,3 +331,4 @@ export function SiparisPage() {
     </div>
   );
 }
+
