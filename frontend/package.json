@@ -1,14 +1,8 @@
 {
   "name": "asakai-frontend",
-  "proxy": "https://asaka-project.onrender.com"
-  
-}
-
-
-{
-  "name": "asakai-frontend",
   "version": "1.0.0",
   "private": true,
+  "proxy": "https://asaka-project.onrender.com",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -20,7 +14,6 @@
     "start": "react-scripts start",
     "build": "react-scripts build"
   },
-  "proxy": "http://localhost:8000",
   "browserslist": {
     "production": [">0.2%", "not dead"],
     "development": ["last 1 chrome version"]
