@@ -31,3 +31,4 @@ app.include_router(auth.router,     prefix="/api/auth",     tags=["Auth"])  # YE
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+

@@ -6,15 +6,14 @@ import KalitePage from "./pages/KalitePage";
 import { ReproPage, EmbossPage, SiparisPage } from "./pages/OtherPages";
 import PlanlamaPage from "./pages/PlanlamaPage";
 import LoginPage from "./pages/LoginPage";
+import AksiyonPage from "./pages/AksiyonPage";
 import "./App.css";
 
 const LOK_LABEL = { cigli: "Çiğli", esbas: "ESBAŞ", karaman: "Karaman" };
 
-// ─── Kullanıcı Context ────────────────────────────────────────────────────────
 export const UserContext = createContext(null);
 export const useUser = () => useContext(UserContext);
 
-// ─── Admin korumalı wrapper ───────────────────────────────────────────────────
 function AdminOnly({ children }) {
   const { user } = useUser();
   if (user?.rol !== "admin") {
@@ -33,7 +32,6 @@ function AdminOnly({ children }) {
   return children;
 }
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
 function Sidebar({ lokasyon, setLokasyon }) {
   const { user, cikisYap } = useUser();
   const isAdmin = user?.rol === "admin";
@@ -45,7 +43,6 @@ function Sidebar({ lokasyon, setLokasyon }) {
         <span className="logo-text">Asakai</span>
       </div>
 
-      {/* Lokasyon seçici — admin tüm lokasyonları, sorumlu sadece kendi lokasyonunu görür */}
       <div className="lok-secici">
         {Object.entries(LOK_LABEL)
           .filter(([k]) => isAdmin || user?.lokasyon === k)
@@ -82,7 +79,9 @@ function Sidebar({ lokasyon, setLokasyon }) {
         <NavLink to="/siparis" className={({ isActive }) => isActive ? "nav-item aktif" : "nav-item"}>
           <span className="nav-icon">◑</span> Sipariş
         </NavLink>
-        {/* Admin paneli sadece admin'e görünür */}
+        <NavLink to="/aksiyon" className={({ isActive }) => isActive ? "nav-item aktif" : "nav-item"}>
+          <span className="nav-icon">◆</span> Aksiyon
+        </NavLink>
         {isAdmin && (
           <NavLink to="/kullanicilar" className={({ isActive }) => isActive ? "nav-item aktif" : "nav-item"}>
             <span className="nav-icon">◐</span> Kullanıcılar
@@ -122,7 +121,6 @@ function Sidebar({ lokasyon, setLokasyon }) {
   );
 }
 
-// ─── Kullanıcı Yönetim Sayfası (sadece admin) ─────────────────────────────────
 function KullanicilarPage() {
   const [liste, setListe] = useState([]);
   const [form, setForm] = useState({ ad_soyad: "", kullanici_adi: "", sifre: "", rol: "sorumlu", lokasyon: "cigli" });
@@ -149,7 +147,6 @@ function KullanicilarPage() {
         {mesaj && <span className="rozet yesil">{mesaj}</span>}
       </div>
 
-      {/* Yeni Kullanıcı Formu */}
       <div className="tablo-kap" style={{ marginBottom: 20 }}>
         <div className="tablo-baslik"><h3>Yeni Kullanıcı Ekle</h3></div>
         <div style={{ padding: 20 }}>
@@ -186,7 +183,6 @@ function KullanicilarPage() {
         </div>
       </div>
 
-      {/* Mevcut Kullanıcılar */}
       <div className="tablo-kap">
         <div className="tablo-baslik"><h3>Mevcut Kullanıcılar ({liste.length})</h3></div>
         <table>
@@ -213,7 +209,6 @@ function KullanicilarPage() {
   );
 }
 
-// ─── Ana App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("asakai_user")); }
@@ -226,12 +221,10 @@ export default function App() {
     setUser(null);
   };
 
-  // Giriş yapılmadıysa login ekranı göster
   if (!user) {
     return <LoginPage onLogin={(u) => { setUser(u); setLokasyon(u.lokasyon || "cigli"); }} />;
   }
 
-  // Sorumlu girişinde kendi lokasyonunu otomatik seç
   const aktifLokasyon = user.rol === "admin" ? lokasyon : user.lokasyon;
 
   return (
@@ -248,6 +241,7 @@ export default function App() {
               <Route path="/repro"        element={<ReproPage />} />
               <Route path="/emboss"       element={<EmbossPage />} />
               <Route path="/siparis"      element={<SiparisPage />} />
+              <Route path="/aksiyon"      element={<AksiyonPage />} />
               <Route path="/kullanicilar" element={<AdminOnly><KullanicilarPage /></AdminOnly>} />
             </Routes>
           </main>
